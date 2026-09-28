@@ -10,54 +10,54 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 
-# --- Налаштування бота ---
-TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s" # Вставте сюди ваш токен
+# --- Bot Settings ---
+TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s" # Insert your token here
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- Стани (FSM) ---
+# --- States (FSM) ---
 class PDFBuilder(StatesGroup):
     waiting_for_photos = State()
     waiting_for_name = State()
 
-# --- Клавіатури ---
+# --- Keyboards ---
 def main_menu():
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="🖼 Створити PDF")]],
+        keyboard=[[KeyboardButton(text="🖼 Create PDF")]],
         resize_keyboard=True
     )
 
 def finish_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="✅ Готово (Задати назву)")],
-            [KeyboardButton(text="❌ Скасувати")]
+            [KeyboardButton(text="✅ Done (Set name)")],
+            [KeyboardButton(text="❌ Cancel")]
         ],
         resize_keyboard=True
     )
 
-# --- Обробники команд ---
+# --- Command Handlers ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Привіт! Я бот, який робить PDF з фотографій.\nНатисніть кнопку нижче, щоб розпочати.",
+        "Hello! I am a bot that creates PDFs from photos.\nPress the button below to start.",
         reply_markup=main_menu()
     )
 
-@dp.message(F.text == "❌ Скасувати")
+@dp.message(F.text == "❌ Cancel")
 async def cancel_action(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("Дію скасовано.", reply_markup=main_menu())
+    await message.answer("Action canceled.", reply_markup=main_menu())
 
-@dp.message(F.text == "🖼 Створити PDF")
+@dp.message(F.text == "🖼 Create PDF")
 async def start_pdf_creation(message: Message, state: FSMContext):
     await state.set_state(PDFBuilder.waiting_for_photos)
     await state.update_data(photos=[])
     await message.answer(
-        "Відправляйте мені фотографії (можна по одній або альбомом).\n"
-        "Коли закінчите, натисніть «✅ Готово».",
+        "Send me photos (one by one or as an album).\n"
+        "When finished, press «✅ Done».",
         reply_markup=finish_menu()
     )
 
@@ -67,52 +67,52 @@ async def collect_photos(message: Message, state: FSMContext):
     data = await state.get_data()
     
     photos = data.get("photos", [])
-    # Сохраняем словарь: ID сообщения для сортировки и ID самого файла
+    # Save a dictionary: message ID for sorting and the file ID itself
     photos.append({"msg_id": message.message_id, "file_id": photo_id})
     
     await state.update_data(photos=photos)
 
-@dp.message(PDFBuilder.waiting_for_photos, F.text == "✅ Готово (Задати назву)")
+@dp.message(PDFBuilder.waiting_for_photos, F.text == "✅ Done (Set name)")
 async def request_filename(message: Message, state: FSMContext):
     data = await state.get_data()
     photos = data.get("photos", [])
     
     if not photos:
-        await message.answer("Ви не надіслали жодного фото! Спробуйте ще раз або натисніть «Скасувати».")
+        await message.answer("You haven't sent any photos! Try again or press «Cancel».")
         return
         
     await state.set_state(PDFBuilder.waiting_for_name)
     await message.answer(
-        f"Отримано фото: {len(photos)} шт.\nТепер напишіть бажану назву для PDF файлу (наприклад: *My_Photos*):",
+        f"Received photos: {len(photos)}\nNow enter the desired name for the PDF file (e.g., *My_Photos*):",
         parse_mode="Markdown"
     )
 
 @dp.message(PDFBuilder.waiting_for_name, F.text)
 async def generate_and_send_pdf(message: Message, state: FSMContext):
-    # РЕШЕНИЕ 2: Заменяем переносы строк на пробелы
+    # SOLUTION 2: Replace newlines with spaces
     file_name = message.text.replace('\n', ' ').strip()
     
-    # Дополнительно: удаляем символы, которые запрещены в названиях файлов ОС (\, /, *, ?, ", <, >, |)
+    # Additionally: remove characters that are forbidden in OS filenames (\, /, *, ?, ", <, >, |)
     file_name = re.sub(r'[\\/*?:"<>|]', "", file_name)
     
-    # Добавляем расширение, если его нет
+    # Add extension if it's missing
     if not file_name.lower().endswith(".pdf"):
         file_name += ".pdf"
         
     data = await state.get_data()
     raw_photos = data.get("photos", [])
     
-    # РЕШЕНИЕ 1: Сортируем фото по ID сообщения, чтобы вернуть строгий хронологический порядок
+    # SOLUTION 1: Sort photos by message ID to ensure strict chronological order
     raw_photos.sort(key=lambda x: x["msg_id"])
     
-    # Достаем только file_id из отсортированного списка
+    # Extract only file_id from the sorted list
     photo_ids = [item["file_id"] for item in raw_photos]
     
-    msg_status = await message.answer("⏳ Обробка зображень та створення PDF... Зачекайте хвилинку.")
+    msg_status = await message.answer("⏳ Processing images and creating PDF... Please wait a moment.")
     
     images = []
     try:
-        # Загружаем каждое фото в память (порядок теперь 100% правильный)
+        # Load each photo into memory (the order is now 100% correct)
         for file_id in photo_ids:
             file_info = await bot.get_file(file_id)
             img_bytes = BytesIO()
@@ -121,7 +121,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
             img = Image.open(img_bytes).convert("RGB")
             images.append(img)
             
-        # Создаем PDF в памяти
+        # Create PDF in memory
         pdf_bytes = BytesIO()
         images[0].save(
             pdf_bytes, 
@@ -131,16 +131,16 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         )
         pdf_bytes.seek(0)
         
-        # Отправляем готовый документ
+        # Send the finished document
         document = BufferedInputFile(pdf_bytes.read(), filename=file_name)
         await message.answer_document(
             document, 
-            caption=f"Ось ваш файл: {file_name}",
+            caption=f"Here is your file: {file_name}",
             reply_markup=main_menu()
         )
         
     except Exception as e:
-        await message.answer(f"Виникла помилка при створенні PDF: {e}", reply_markup=main_menu())
+        await message.answer(f"An error occurred while creating the PDF: {e}", reply_markup=main_menu())
     finally:
         await bot.delete_message(chat_id=message.chat.id, message_id=msg_status.message_id)
         await state.clear()
@@ -153,15 +153,15 @@ async def start_web_server():
     app.router.add_get("/", handle_ping)
     runner = web.AppRunner(app)
     await runner.setup()
-    # Render передає порт через змінну середовища PORT (за замовчуванням 8080)
+    # Render passes the port via the PORT environment variable (default is 8080)
     import os
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
 
 async def main():
-    await start_web_server() # запускаємо пінговий сервер
-    print("Бот запущений...")
+    await start_web_server() # start the ping server
+    print("Bot is running...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
