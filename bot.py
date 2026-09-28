@@ -16,6 +16,8 @@ TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s"
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+ANIMATION_FILE_ID = "AAMCAgADGQEAAS9ACWq672ItwNOLwCJj9zQl3WTbBMrLAAJvrwACP8DYSaPf_lAlobXBAQAHbQADPQQ"
+
 # --- DB settings ---
 ADMIN_ID = 750631739
 GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbx54zrZsExx2wWJ-qvpE1cju0bbna7IFKzdYFfOiWP4d0YCIWct5GIUQndVypFNqn_p/exec"
@@ -156,7 +158,9 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
     # Extract only file_id from the sorted list
     photo_ids = [item["file_id"] for item in raw_photos]
     
-    msg_status = await message.answer("⏳ Processing images and creating PDF... Please wait a moment.")
+    msg_status = await message.answer_sticker(sticker=ANIMATION_FILE_ID,
+        caption="⏳ Processing images and creating PDF... Please wait a moment."
+    )
     
     images = []
     try:
