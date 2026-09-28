@@ -1,5 +1,6 @@
 import asyncio
 import re
+import sqlite3
 
 from io import BytesIO
 from PIL import Image
@@ -14,6 +15,18 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, Buffered
 TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s" # Insert your token here
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+# --- BD settings ---
+ADMIN_ID = 750631739
+
+conn = sqlite3.connect('users.db')
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY
+    )
+''')
+conn.commit()
 
 # --- States (FSM) ---
 class PDFBuilder(StatesGroup):
@@ -37,10 +50,27 @@ def finish_menu():
     )
 
 # --- Command Handlers ---
-
+@dp.message(Command("stats"))
+async def cmd_stats(message: Message):
+    # Проверяем, что команду вызвал админ
+    if message.from_user.id != ADMIN_ID:
+        return # Если это не вы, бот просто проигнорирует команду
+        
+    # Считаем количество пользователей
+    cursor.execute("SELECT COUNT(*) FROM users")
+    count = cursor.fetchone()[0]
+    
+    await message.answer(f"📊 <b>Статистика бота:</b>\nВсего уникальных пользователей: {count}", parse_mode="HTML")
+    
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
+    
+    # Добавляем пользователя в базу
+    user_id = message.from_user.id
+    cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
+    conn.commit()
+    
     await message.answer(
         "Hello! I am a bot that creates PDFs from photos.\nPress the button below to start.",
         reply_markup=main_menu()
