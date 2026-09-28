@@ -157,6 +157,12 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
             caption=f"Here is your file: {file_name}",
             reply_markup=main_menu()
         )
+
+        await message.answer(
+            "If you are enjoying this bot, please consider donating to kill more russian invaders in Ukraine:\n"
+            "👉 https://send.monobank.ua/jar/24co4sQf7r",
+            disable_web_page_preview=True
+        )
         
     except Exception as e:
         await message.answer(f"An error occurred while creating the PDF: {e}", reply_markup=main_menu())
