@@ -1,5 +1,5 @@
 import asyncio
-import os # Moved module import to the top
+import os
 import re
 import sqlite3
 
@@ -10,18 +10,17 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+# Убедитесь, что LinkPreviewOptions есть в этом списке!
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions
 
 # --- Bot Settings ---
-# Insert NEW token, the old one is compromised
-TOKEN = "YOUR_NEW_TOKEN" 
+TOKEN = "YOUR_NEW_TOKEN" # Не забудьте вставить ваш токен!
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # --- DB settings ---
 ADMIN_ID = 750631739
 
-# ADDED: check_same_thread=False for correct asyncio operation
 conn = sqlite3.connect('users.db', check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute('''
@@ -151,17 +150,19 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         )
         pdf_bytes.seek(0)
         
+        # Отправляем документ
         document = BufferedInputFile(pdf_bytes.read(), filename=file_name)
         await message.answer_document(
             document, 
             caption=f"Here is your file: {file_name}",
             reply_markup=main_menu()
         )
-
+        
+        # --- СООБЩЕНИЕ О ДОНАТЕ ---
         await message.answer(
-            "If you are enjoying this bot, please consider donating to kill more russian invaders in Ukraine:\n"
-            "👉 https://send.monobank.ua/jar/24co4sQf7r",
-            disable_web_page_preview=True
+            "If you like this bot and want to support its development, you can buy me a coffee! ☕️\n"
+            "👉 https://buymeacoffee.com/your_link",
+            link_preview_options=LinkPreviewOptions(is_disabled=True)
         )
         
     except Exception as e:
@@ -186,7 +187,6 @@ async def main():
     await start_web_server() 
     print("Bot is running...")
     
-    # ADDED: Drop pending updates before starting
     await bot.delete_webhook(drop_pending_updates=True) 
     await dp.start_polling(bot)
 
