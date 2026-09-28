@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions
 
 # --- Bot Settings ---
 # Insert NEW token, the old one is compromised
