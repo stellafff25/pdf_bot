@@ -1,7 +1,7 @@
 import asyncio
 import os
 import re
-import sqlite3
+import aiohttp
 
 from io import BytesIO
 from PIL import Image
@@ -10,25 +10,16 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-# Убедитесь, что LinkPreviewOptions есть в этом списке!
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions
 
 # --- Bot Settings ---
-TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s"
+TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s" 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # --- DB settings ---
 ADMIN_ID = 750631739
-
-conn = sqlite3.connect('users.db', check_same_thread=False)
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY
-    )
-''')
-conn.commit()
+GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbx54zrZsExx2wWJ-qvpE1cju0bbna7IFKzdYFfOiWP4d0YCIWct5GIUQndVypFNqn_p/exec"
 
 # --- States (FSM) ---
 class PDFBuilder(StatesGroup):
@@ -57,18 +48,29 @@ async def cmd_stats(message: Message):
     if message.from_user.id != ADMIN_ID:
         return 
         
-    cursor.execute("SELECT COUNT(*) FROM users")
-    count = cursor.fetchone()[0]
-    
-    await message.answer(f"📊 <b>Bot Statistics:</b>\nTotal unique users: {count}", parse_mode="HTML")
+    try:
+        # Запрашиваем количество строк из Google Таблицы
+        async with aiohttp.ClientSession() as session:
+            async with session.get(GOOGLE_SHEET_URL) as response:
+                count = await response.text()
+                
+        await message.answer(f"📊 <b>Bot Statistics:</b>\nTotal unique users: {count}", parse_mode="HTML")
+    except Exception as e:
+        await message.answer("Error fetching stats.")
     
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     
-    user_id = message.from_user.id
-    cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
-    conn.commit()
+    # Отправляем ID пользователя в Google Таблицу в фоновом режиме
+    async def send_to_google():
+        try:
+            async with aiohttp.ClientSession() as session:
+                await session.post(GOOGLE_SHEET_URL, json={"user_id": message.from_user.id})
+        except Exception as e:
+            print(f"Google error: {e}")
+            
+    asyncio.create_task(send_to_google())
     
     await message.answer(
         "Hello! I am a bot that creates PDFs from photos.\nPress the button below to start.",
@@ -150,7 +152,6 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         )
         pdf_bytes.seek(0)
         
-        # Отправляем документ
         document = BufferedInputFile(pdf_bytes.read(), filename=file_name)
         await message.answer_document(
             document, 
@@ -158,10 +159,10 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
             reply_markup=main_menu()
         )
         
-        # --- СООБЩЕНИЕ О ДОНАТЕ ---
         await message.answer(
             "If you are enjoying this bot, please consider donating to kill more russian invaders in Ukraine:\n"
-            "👉 https://send.monobank.ua/jar/24co4sQf7r"
+            "👉 https://send.monobank.ua/jar/24co4sQf7r",
+            link_preview_options=LinkPreviewOptions(is_disabled=True)
         )
         
     except Exception as e:
