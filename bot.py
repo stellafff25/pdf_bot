@@ -208,10 +208,8 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         await message.answer(f"An error occurred while creating the PDF: {e}", reply_markup=main_menu())
     finally:
         # Safely clean up both status messages and reset FSM
-        if msg_status_text:
-            await bot.delete_message(chat_id=message.chat.id, message_id=msg_status_text.message_id)
-        if msg_status_sticker:
-            await bot.delete_message(chat_id=message.chat.id, message_id=msg_status_sticker.message_id)
+        if msg_status:
+            await bot.delete_message(chat_id=message.chat.id, message_id=msg_status.message_id)
         await state.clear()
 
 async def handle_ping(request):
