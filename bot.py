@@ -84,6 +84,15 @@ async def cancel_action(message: Message, state: FSMContext):
 
 @dp.message(F.text == "🖼 Create PDF")
 async def start_pdf_creation(message: Message, state: FSMContext):
+    async def send_to_google():
+        try:
+            async with aiohttp.ClientSession() as session:
+                await session.post(GOOGLE_SHEET_URL, json={"user_id": message.from_user.id})
+        except Exception as e:
+            pass
+            
+    asyncio.create_task(send_to_google())
+
     await state.set_state(PDFBuilder.waiting_for_photos)
     await state.update_data(photos=[])
     await message.answer(
@@ -119,22 +128,37 @@ async def request_filename(message: Message, state: FSMContext):
 
 @dp.message(PDFBuilder.waiting_for_name, F.text)
 async def generate_and_send_pdf(message: Message, state: FSMContext):
-    file_name = message.text.replace('\n', ' ').strip()
+    # Replace newlines with spaces
+    file_name = message.text.replace('\n', ' ')
+    
+    # Remove characters forbidden in OS filenames
     file_name = re.sub(r'[\\/*?:"<>|]', "", file_name)
     
+    # Remove leading/trailing spaces and dots (fixes the "..." issue)
+    file_name = file_name.strip(" .")
+    
+    # If the name is empty after cleaning, use a default fallback name
+    if not file_name:
+        file_name = "My_Photos"
+        
+    # Add extension if missing
     if not file_name.lower().endswith(".pdf"):
         file_name += ".pdf"
         
     data = await state.get_data()
     raw_photos = data.get("photos", [])
     
+    # Sort photos by message ID to ensure strict chronological order
     raw_photos.sort(key=lambda x: x["msg_id"])
+    
+    # Extract only file_id from the sorted list
     photo_ids = [item["file_id"] for item in raw_photos]
     
     msg_status = await message.answer("⏳ Processing images and creating PDF... Please wait a moment.")
     
     images = []
     try:
+        # Load each photo into memory 
         for file_id in photo_ids:
             file_info = await bot.get_file(file_id)
             img_bytes = BytesIO()
@@ -143,6 +167,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
             img = Image.open(img_bytes).convert("RGB")
             images.append(img)
             
+        # Create PDF in memory
         pdf_bytes = BytesIO()
         images[0].save(
             pdf_bytes, 
@@ -152,6 +177,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         )
         pdf_bytes.seek(0)
         
+        # Send the finished document
         document = BufferedInputFile(pdf_bytes.read(), filename=file_name)
         await message.answer_document(
             document, 
@@ -159,6 +185,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
             reply_markup=main_menu()
         )
         
+        # --- DONATION MESSAGE ---
         await message.answer(
             "If you are enjoying this bot, please consider donating to kill more russian invaders in Ukraine:\n"
             "👉 https://send.monobank.ua/jar/24co4sQf7r",
@@ -168,6 +195,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"An error occurred while creating the PDF: {e}", reply_markup=main_menu())
     finally:
+        # Clean up the status message and reset FSM
         await bot.delete_message(chat_id=message.chat.id, message_id=msg_status.message_id)
         await state.clear()
 
