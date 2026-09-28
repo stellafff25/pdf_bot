@@ -190,8 +190,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         # --- DONATION MESSAGE ---
         await message.answer(
             "If you are enjoying this bot, please consider donating to kill more russian invaders in Ukraine:\n"
-            "👉 https://send.monobank.ua/jar/24co4sQf7r",
-            link_preview_options=LinkPreviewOptions(is_disabled=True)
+            "👉 https://send.monobank.ua/jar/24co4sQf7r"
         )
         
     except Exception as e:
