@@ -16,7 +16,7 @@ TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s"
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-ANIMATION_FILE_ID = "CAACAgIAAxkBAAEvQAlquu9iLcDTi8AiY_c0Jd1k2wTKywACb68AAj_A2Emj3_5QJaG1wT0E"
+ANIMATION_FILE_ID = "CgACAgIAAxkBAAEvQB9quvTapq3JD7CJ7kmRP8ikSnWf-QACkacAAr9y2Uld3jAkOdvqSj0E"
 
 # --- DB settings ---
 ADMIN_ID = 750631739
@@ -165,8 +165,10 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
     
     try:
         # Send text and sticker separately (stickers do not support captions)
-        msg_status_text = await message.answer("⏳ Processing images and creating PDF... Please wait a moment.")
-        msg_status_sticker = await message.answer_sticker(sticker=ANIMATION_FILE_ID)
+        msg_status = await message.answer_animation(
+            animation=ANIMATION_FILE_ID,
+            caption="⏳ Processing images and creating PDF... Please wait a moment."
+        )
         
         # Load each photo into memory 
         for file_id in photo_ids:
