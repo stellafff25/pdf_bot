@@ -10,9 +10,8 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions, ReplyKeyboardRemove
 
-# --- Bot Settings ---
 TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s" 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -121,9 +120,12 @@ async def request_filename(message: Message, state: FSMContext):
         return
         
     await state.set_state(PDFBuilder.waiting_for_name)
+    
+    # --- ADDED: reply_markup=ReplyKeyboardRemove() to hide the keyboard ---
     await message.answer(
         f"Received photos: {len(photos)}\nNow enter the desired name for the PDF file (e.g., *My_Photos*):",
-        parse_mode="Markdown"
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardRemove() 
     )
 
 @dp.message(PDFBuilder.waiting_for_name, F.text)
