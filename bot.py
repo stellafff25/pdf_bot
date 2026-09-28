@@ -1,7 +1,8 @@
 import asyncio
+import re
+
 from io import BytesIO
 from PIL import Image
-
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
@@ -62,17 +63,14 @@ async def start_pdf_creation(message: Message, state: FSMContext):
 
 @dp.message(PDFBuilder.waiting_for_photos, F.photo)
 async def collect_photos(message: Message, state: FSMContext):
-    # Отримуємо найвищу якість фото (останній елемент масиву)
     photo_id = message.photo[-1].file_id
-    
     data = await state.get_data()
+    
     photos = data.get("photos", [])
-    photos.append(photo_id)
+    # Сохраняем словарь: ID сообщения для сортировки и ID самого файла
+    photos.append({"msg_id": message.message_id, "file_id": photo_id})
     
     await state.update_data(photos=photos)
-    # Відповідаємо тихо, щоб не спамити під час відправки альбому
-    # Можна розкоментувати рядок нижче, якщо хочете отримувати сповіщення на кожне фото:
-    # await message.answer(f"Фото додано! Всього: {len(photos)}")
 
 @dp.message(PDFBuilder.waiting_for_photos, F.text == "✅ Готово (Задати назву)")
 async def request_filename(message: Message, state: FSMContext):
@@ -91,29 +89,39 @@ async def request_filename(message: Message, state: FSMContext):
 
 @dp.message(PDFBuilder.waiting_for_name, F.text)
 async def generate_and_send_pdf(message: Message, state: FSMContext):
-    file_name = message.text.strip()
-    # Додаємо розширення, якщо його немає
+    # РЕШЕНИЕ 2: Заменяем переносы строк на пробелы
+    file_name = message.text.replace('\n', ' ').strip()
+    
+    # Дополнительно: удаляем символы, которые запрещены в названиях файлов ОС (\, /, *, ?, ", <, >, |)
+    file_name = re.sub(r'[\\/*?:"<>|]', "", file_name)
+    
+    # Добавляем расширение, если его нет
     if not file_name.lower().endswith(".pdf"):
         file_name += ".pdf"
         
     data = await state.get_data()
-    photo_ids = data.get("photos", [])
+    raw_photos = data.get("photos", [])
+    
+    # РЕШЕНИЕ 1: Сортируем фото по ID сообщения, чтобы вернуть строгий хронологический порядок
+    raw_photos.sort(key=lambda x: x["msg_id"])
+    
+    # Достаем только file_id из отсортированного списка
+    photo_ids = [item["file_id"] for item in raw_photos]
     
     msg_status = await message.answer("⏳ Обробка зображень та створення PDF... Зачекайте хвилинку.")
     
     images = []
     try:
-        # Завантажуємо кожне фото в пам'ять
+        # Загружаем каждое фото в память (порядок теперь 100% правильный)
         for file_id in photo_ids:
             file_info = await bot.get_file(file_id)
             img_bytes = BytesIO()
             await bot.download_file(file_info.file_path, img_bytes)
             
-            # Конвертуємо у RGB (бо PDF не підтримує альфа-канал RGBA напряму)
             img = Image.open(img_bytes).convert("RGB")
             images.append(img)
             
-        # Створюємо PDF у пам'яті
+        # Создаем PDF в памяти
         pdf_bytes = BytesIO()
         images[0].save(
             pdf_bytes, 
@@ -123,7 +131,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         )
         pdf_bytes.seek(0)
         
-        # Відправляємо готовий документ
+        # Отправляем готовый документ
         document = BufferedInputFile(pdf_bytes.read(), filename=file_name)
         await message.answer_document(
             document, 
