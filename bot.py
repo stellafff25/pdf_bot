@@ -161,8 +161,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         # --- СООБЩЕНИЕ О ДОНАТЕ ---
         await message.answer(
             "If you like this bot and want to support its development, you can buy me a coffee! ☕️\n"
-            "👉 https://buymeacoffee.com/your_link",
-            link_preview_options=LinkPreviewOptions(is_disabled=True)
+            "👉 https://buymeacoffee.com/your_link"
         )
         
     except Exception as e:
