@@ -14,7 +14,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions
 
 # --- Bot Settings ---
-TOKEN = "YOUR_NEW_TOKEN" # Не забудьте вставить ваш токен!
+TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s"
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
