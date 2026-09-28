@@ -1,4 +1,5 @@
 import asyncio
+import os # Moved module import to the top
 import re
 import sqlite3
 
@@ -12,14 +13,16 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 
 # --- Bot Settings ---
-TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s" # Insert your token here
+# Insert NEW token, the old one is compromised
+TOKEN = "YOUR_NEW_TOKEN" 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- BD settings ---
+# --- DB settings ---
 ADMIN_ID = 750631739
 
-conn = sqlite3.connect('users.db')
+# ADDED: check_same_thread=False for correct asyncio operation
+conn = sqlite3.connect('users.db', check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
@@ -52,21 +55,18 @@ def finish_menu():
 # --- Command Handlers ---
 @dp.message(Command("stats"))
 async def cmd_stats(message: Message):
-    # Проверяем, что команду вызвал админ
     if message.from_user.id != ADMIN_ID:
-        return # Если это не вы, бот просто проигнорирует команду
+        return 
         
-    # Считаем количество пользователей
     cursor.execute("SELECT COUNT(*) FROM users")
     count = cursor.fetchone()[0]
     
-    await message.answer(f"📊 <b>Статистика бота:</b>\nВсего уникальных пользователей: {count}", parse_mode="HTML")
+    await message.answer(f"📊 <b>Bot Statistics:</b>\nTotal unique users: {count}", parse_mode="HTML")
     
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     
-    # Добавляем пользователя в базу
     user_id = message.from_user.id
     cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
     conn.commit()
@@ -97,7 +97,6 @@ async def collect_photos(message: Message, state: FSMContext):
     data = await state.get_data()
     
     photos = data.get("photos", [])
-    # Save a dictionary: message ID for sorting and the file ID itself
     photos.append({"msg_id": message.message_id, "file_id": photo_id})
     
     await state.update_data(photos=photos)
@@ -119,30 +118,22 @@ async def request_filename(message: Message, state: FSMContext):
 
 @dp.message(PDFBuilder.waiting_for_name, F.text)
 async def generate_and_send_pdf(message: Message, state: FSMContext):
-    # SOLUTION 2: Replace newlines with spaces
     file_name = message.text.replace('\n', ' ').strip()
-    
-    # Additionally: remove characters that are forbidden in OS filenames (\, /, *, ?, ", <, >, |)
     file_name = re.sub(r'[\\/*?:"<>|]', "", file_name)
     
-    # Add extension if it's missing
     if not file_name.lower().endswith(".pdf"):
         file_name += ".pdf"
         
     data = await state.get_data()
     raw_photos = data.get("photos", [])
     
-    # SOLUTION 1: Sort photos by message ID to ensure strict chronological order
     raw_photos.sort(key=lambda x: x["msg_id"])
-    
-    # Extract only file_id from the sorted list
     photo_ids = [item["file_id"] for item in raw_photos]
     
     msg_status = await message.answer("⏳ Processing images and creating PDF... Please wait a moment.")
     
     images = []
     try:
-        # Load each photo into memory (the order is now 100% correct)
         for file_id in photo_ids:
             file_info = await bot.get_file(file_id)
             img_bytes = BytesIO()
@@ -151,7 +142,6 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
             img = Image.open(img_bytes).convert("RGB")
             images.append(img)
             
-        # Create PDF in memory
         pdf_bytes = BytesIO()
         images[0].save(
             pdf_bytes, 
@@ -161,7 +151,6 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         )
         pdf_bytes.seek(0)
         
-        # Send the finished document
         document = BufferedInputFile(pdf_bytes.read(), filename=file_name)
         await message.answer_document(
             document, 
@@ -183,15 +172,16 @@ async def start_web_server():
     app.router.add_get("/", handle_ping)
     runner = web.AppRunner(app)
     await runner.setup()
-    # Render passes the port via the PORT environment variable (default is 8080)
-    import os
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
 
 async def main():
-    await start_web_server() # start the ping server
+    await start_web_server() 
     print("Bot is running...")
+    
+    # ADDED: Drop pending updates before starting
+    await bot.delete_webhook(drop_pending_updates=True) 
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
