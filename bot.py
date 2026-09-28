@@ -50,7 +50,7 @@ async def cmd_stats(message: Message):
         return 
         
     try:
-        # Запрашиваем количество строк из Google Таблицы
+        # Fetch the number of rows from Google Sheets
         async with aiohttp.ClientSession() as session:
             async with session.get(GOOGLE_SHEET_URL) as response:
                 count = await response.text()
@@ -63,7 +63,7 @@ async def cmd_stats(message: Message):
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     
-    # Отправляем ID пользователя в Google Таблицу в фоновом режиме
+    # Send user ID to Google Sheets in the background
     async def send_to_google():
         try:
             async with aiohttp.ClientSession() as session:
@@ -85,6 +85,7 @@ async def cancel_action(message: Message, state: FSMContext):
 
 @dp.message(F.text == "🖼 Create PDF")
 async def start_pdf_creation(message: Message, state: FSMContext):
+    # Send user ID to Google Sheets for returning users
     async def send_to_google():
         try:
             async with aiohttp.ClientSession() as session:
@@ -123,7 +124,7 @@ async def request_filename(message: Message, state: FSMContext):
         
     await state.set_state(PDFBuilder.waiting_for_name)
     
-    # --- ADDED: reply_markup=ReplyKeyboardRemove() to hide the keyboard ---
+    # Hide the keyboard using ReplyKeyboardRemove()
     await message.answer(
         f"Received photos: {len(photos)}\nNow enter the desired name for the PDF file (e.g., *My_Photos*):",
         parse_mode="Markdown",
@@ -158,12 +159,15 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
     # Extract only file_id from the sorted list
     photo_ids = [item["file_id"] for item in raw_photos]
     
-    msg_status = await message.answer_sticker(sticker=ANIMATION_FILE_ID,
-        caption="⏳ Processing images and creating PDF... Please wait a moment."
-    )
-    
+    msg_status_text = None
+    msg_status_sticker = None
     images = []
+    
     try:
+        # Send text and sticker separately (stickers do not support captions)
+        msg_status_text = await message.answer("⏳ Processing images and creating PDF... Please wait a moment.")
+        msg_status_sticker = await message.answer_sticker(sticker=ANIMATION_FILE_ID)
+        
         # Load each photo into memory 
         for file_id in photo_ids:
             file_info = await bot.get_file(file_id)
@@ -194,14 +198,18 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         # --- DONATION MESSAGE ---
         await message.answer(
             "If you are enjoying this bot, please consider donating to kill more russian invaders in Ukraine:\n"
-            "👉 https://send.monobank.ua/jar/24co4sQf7r"
+            "👉 https://send.monobank.ua/jar/24co4sQf7r",
+            link_preview_options=LinkPreviewOptions(is_disabled=True)
         )
         
     except Exception as e:
         await message.answer(f"An error occurred while creating the PDF: {e}", reply_markup=main_menu())
     finally:
-        # Clean up the status message and reset FSM
-        await bot.delete_message(chat_id=message.chat.id, message_id=msg_status.message_id)
+        # Safely clean up both status messages and reset FSM
+        if msg_status_text:
+            await bot.delete_message(chat_id=message.chat.id, message_id=msg_status_text.message_id)
+        if msg_status_sticker:
+            await bot.delete_message(chat_id=message.chat.id, message_id=msg_status_sticker.message_id)
         await state.clear()
 
 async def handle_ping(request):
