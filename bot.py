@@ -12,7 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions, ReplyKeyboardRemove
 
-TOKEN = "8994270807:AAE9vOINq0TMScwf6p5tc-CzzuSGOIYpW4s" 
+TOKEN = os.environ.get("BOT_TOKEN")
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
