@@ -212,12 +212,22 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
             await bot.delete_message(chat_id=message.chat.id, message_id=msg_status.message_id)
         await state.clear()
 
+@dp.message(F.animation | F.sticker | F.video)
+async def catch_media_id(message: Message):
+    if message.animation:
+        file_id = message.animation.file_id
+        media_type = "GIF (animation)"
+    elif message.sticker:
+        file_id = message.sticker.file_id
+        media_type = "Стикер (sticker)"
+    elif message.video:
+        file_id = message.video.file_id
+        media_type = "Видео (video)"
+        
+    await message.answer(f"Вот ваш file_id ({media_type}):\n`{file_id}`", parse_mode="Markdown")
+
 async def handle_ping(request):
     return web.Response(text="Bot is alive!")
-
-@dp.message(F.animation)
-async def catch_gif_id(message: Message):
-    await message.answer(f"Вот ваш file_id:\n`{message.animation.file_id}`", parse_mode="Markdown")
 
 async def start_web_server():
     app = web.Application()
