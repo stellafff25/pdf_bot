@@ -215,6 +215,10 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
 async def handle_ping(request):
     return web.Response(text="Bot is alive!")
 
+@dp.message(F.animation)
+async def catch_gif_id(message: Message):
+    await message.answer(f"Вот ваш file_id:\n`{message.animation.file_id}`", parse_mode="Markdown")
+
 async def start_web_server():
     app = web.Application()
     app.router.add_get("/", handle_ping)
