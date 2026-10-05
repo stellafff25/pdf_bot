@@ -167,7 +167,7 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
         # --- БЕРЕМ АНИМАЦИЮ ИЗ ЛОКАЛЬНОЙ ПАПКИ ---
         # Если ваш файл называется иначе, измените "anim.mp4" на ваше название
         msg_status = await message.answer_animation(
-            animation=FSInputFile("anim.mp4"),
+            animation=FSInputFile("anim.gif"),
             caption="⏳ Processing images and creating PDF... Please wait a moment."
         )
         
