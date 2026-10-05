@@ -10,13 +10,14 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions, ReplyKeyboardRemove
+# ВАЖНО: добавлен FSInputFile для загрузки файла из папки
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile, LinkPreviewOptions, ReplyKeyboardRemove, FSInputFile
 
+# --- Bot Settings ---
+# Берем токен из скрытых настроек Render (Environment Variables)
 TOKEN = os.environ.get("BOT_TOKEN")
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
-ANIMATION_FILE_ID = "CgACAgIAAxkBAAEvQB9quvTapq3JD7CJ7kmRP8ikSnWf-QACkacAAr9y2Uld3jAkOdvqSj0E"
 
 # --- DB settings ---
 ADMIN_ID = 750631739
@@ -159,14 +160,14 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
     # Extract only file_id from the sorted list
     photo_ids = [item["file_id"] for item in raw_photos]
     
-    msg_status_text = None
-    msg_status_sticker = None
+    msg_status = None
     images = []
     
     try:
-        # Send text and sticker separately (stickers do not support captions)
+        # --- БЕРЕМ АНИМАЦИЮ ИЗ ЛОКАЛЬНОЙ ПАПКИ ---
+        # Если ваш файл называется иначе, измените "anim.mp4" на ваше название
         msg_status = await message.answer_animation(
-            animation=ANIMATION_FILE_ID,
+            animation=FSInputFile("anim.mp4"),
             caption="⏳ Processing images and creating PDF... Please wait a moment."
         )
         
@@ -207,25 +208,15 @@ async def generate_and_send_pdf(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"An error occurred while creating the PDF: {e}", reply_markup=main_menu())
     finally:
-        # Safely clean up both status messages and reset FSM
+        # Безопасное удаление анимации
         if msg_status:
-            await bot.delete_message(chat_id=message.chat.id, message_id=msg_status.message_id)
+            try:
+                await bot.delete_message(chat_id=message.chat.id, message_id=msg_status.message_id)
+            except Exception as e:
+                print(f"Failed to delete animation: {e}")
         await state.clear()
 
-@dp.message(F.animation | F.sticker | F.video)
-async def catch_media_id(message: Message):
-    if message.animation:
-        file_id = message.animation.file_id
-        media_type = "GIF (animation)"
-    elif message.sticker:
-        file_id = message.sticker.file_id
-        media_type = "Стикер (sticker)"
-    elif message.video:
-        file_id = message.video.file_id
-        media_type = "Видео (video)"
-        
-    await message.answer(f"Вот ваш file_id ({media_type}):\n`{file_id}`", parse_mode="Markdown")
-
+# --- Настройки сервера ---
 async def handle_ping(request):
     return web.Response(text="Bot is alive!")
 
